@@ -1,0 +1,102 @@
+on:
+  release:
+    types: [created]
+
+name: Release Package
+
+jobs:
+  get-version-information:
+    name: Get Version Information
+    runs-on: ubuntu-20.04
+    outputs:
+      version: ${{ steps.split-version.outputs._1 }}
+    steps:
+      - uses: jungwinter/split@v1
+        id: split
+        with:
+          msg: ${{ github.ref }}
+          seperator: '/'
+      - uses: jungwinter/split@v1
+        id: split-version
+        with:
+          msg: ${{ steps.split.outputs._2 }}
+          seperator: '-'
+  ubuntu-20_04-package:
+    runs-on: ubuntu-20.04
+    needs: get-version-information
+    env:
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      LITANI_VERSION: ${{ needs.get-version-information.outputs.version }}
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          submodules: recursive
+      - name: Checkout code
+        uses: actions/checkout@v2
+      - name: Fetch dependencies
+        run: sudo apt-get install -y mandoc scdoc ninja-build
+      - name: make dir structure
+        run: mkdir -p litani-${{ env.LITANI_VERSION }}/{DEBIAN,usr/{bin,libexec/litani,share/{doc/{litani},man/{man1,man5,man7}}}}
+      - name: create control file
+        run: |
+          touch litani-${{ env.LITANI_VERSION }}/DEBIAN/control
+          cat << EOF > litani-${{ env.LITANI_VERSION }}/DEBIAN/control
+          Package: Litani
+          Version: ${{ env.LITANI_VERSION }}
+          Architecture: amd64
+          Depends: ninja-build, gnuplot, graphviz, python3.9, python3-jinja2, python3-voluptuous
+          Maintainer: Kareem Khazem <karkhaz@amazon.co.uk>
+          Description: A program that provides platform-independent job control.
+            AWS Build Accumulator collects build jobs from multiple sources before executing them concurrently. It provides platform-independent job control (timeouts, return code control) and an output format that is easy to render into reports (for example, using the built-in renderer). AWS Build Accumulator shines where your project uses multiple different build systems or requires a unified interface describing heterogeneous build jobs.
+          EOF
+      - name: clone litani
+        run: sudo git clone https://github.com/awslabs/aws-build-accumulator.git /usr/libexec/litani
+      - name: create symlink
+        run: sudo ln -s /usr/libexec/litani/litani litani-${{ env.LITANI_VERSION }}/usr/bin/
+      - name: copy to usr/libexec
+        run: |
+          cp -r /usr/libexec/litani/litani litani-${{ env.LITANI_VERSION }}/usr/libexec/litani/
+          cp -r /usr/libexec/litani/lib litani-${{ env.LITANI_VERSION }}/usr/libexec/litani/
+          cp -r /usr/libexec/litani/bin litani-${{ env.LITANI_VERSION }}/usr/libexec/litani/
+          cp -r /usr/libexec/litani/templates litani-${{ env.LITANI_VERSION }}/usr/libexec/litani/
+          cp -r /usr/libexec/litani/doc litani-${{ env.LITANI_VERSION }}/usr/libexec/litani/
+      - name: update share
+        run: |
+          ./litani-${{ env.LITANI_VERSION }}/usr/libexec/litani/doc/configure && ninja
+          mv litani-${{ env.LITANI_VERSION }}/usr/libexec/litani/doc/out/man/*.1 litani-${{ env.LITANI_VERSION }}/usr/share/man/man1
+          mv litani-${{ env.LITANI_VERSION }}/usr/libexec/litani/doc/out/man/*.5 litani-${{ env.LITANI_VERSION }}/usr/share/man/man5
+          mv litani-${{ env.LITANI_VERSION }}/usr/libexec/litani/doc/out/man/*.7 litani-${{ env.LITANI_VERSION }}/usr/share/man/man7
+      - name: remove files
+        run: |
+          rm -rf litani-${{ env.LITANI_VERSION }}/usr/libexec/litani/doc
+          sudo rm -rf /usr/libexec/litani
+      - name: Create .deb package
+        id: create_packages
+        run: |
+          sudo dpkg-deb --build --root-owner-group litani-${{ env.LITANI_VERSION }}
+          deb_package_name="$(ls *.deb)"
+          echo "::set-output name=deb_package::$deb_package_name"
+          echo "::set-output name=deb_package_name::$deb_package_name"
+      - name: Setup deb package
+        run: |
+          sudo apt-get update
+          sudo apt install -y ./litani-${{ env.LITANI_VERSION }}.deb
+      - name: Test deb package
+        run: |
+          litani -h
+          man litani
+          litani init --project-name nyx --stages codegen verify check
+          litani add-job --command 'which brew' --pipeline-name 'siesta' --ci-stage codegen --phony-outputs phony_1
+          litani add-job --command 'which python3' --pipeline-name 'siesta' --ci-stage verify --inputs phony_1 --phony-outputs phony_2
+          litani add-job --command 'which docker' --pipeline-name 'siesta' --ci-stage check --inputs phony_2  --phony-outputs phony_3
+          litani run-build
+      - name: Get release
+        id: get_release_info
+        uses: bruceadams/get-release@v1.2.3
+      - name: Upload release binary
+        uses: actions/upload-release-asset@v1.0.2
+        with:
+          upload_url: ${{ steps.get_release_info.outputs.upload_url }}
+          asset_path: ${{ steps.create_packages.outputs.deb_package }}
+          asset_name: ${{ steps.create_packages.outputs.deb_package_name }}
+          asset_content_type: application/x-deb
