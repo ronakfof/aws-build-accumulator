@@ -1,6 +1,6 @@
 on:
   release:
-    types: [created]
+    types: [created, edited, publishd]
 
 name: Release Package
 
@@ -25,7 +25,7 @@ jobs:
     runs-on: ubuntu-20.04
     needs: get-version-information
     env:
-      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      GITHUB_TOKEN: ${{ secrets.ronakf-personal }}
       LITANI_VERSION: ${{ needs.get-version-information.outputs.version }}
     steps:
       - uses: actions/checkout@v2
