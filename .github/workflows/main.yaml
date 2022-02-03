@@ -26,6 +26,8 @@ jobs:
     name: Perform Release
     runs-on: ubuntu-20.04
     needs: get-version-information
+    outputs:
+      version: ${{ needs.get-version-information.outputs.version }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v2
@@ -70,7 +72,7 @@ jobs:
       needs: perform-release
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        LITANI_VERSION: ${{ needs.get-version-information.outputs.version }}
+        LITANI_VERSION: ${{ needs.perform-release.outputs.version }}
       steps:
         - uses: actions/checkout@v2
           with:
