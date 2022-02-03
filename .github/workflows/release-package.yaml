@@ -1,32 +1,12 @@
 on:
   release:
     types: [created]
-
 name: Release Package
-
 jobs:
-  get-version-information:
-    name: Get Version Information
-    runs-on: ubuntu-20.04
-    outputs:
-      version: ${{ steps.split-version.outputs._1 }}
-    steps:
-      - uses: jungwinter/split@v1
-        id: split
-        with:
-          msg: ${{ github.ref }}
-          seperator: '/'
-      - uses: jungwinter/split@v1
-        id: split-version
-        with:
-          msg: ${{ steps.split.outputs._2 }}
-          seperator: '-'
   ubuntu-20_04-package:
     runs-on: ubuntu-20.04
-    needs: get-version-information
     env:
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      LITANI_VERSION: ${{ needs.get-version-information.outputs.version }}
     steps:
       - uses: actions/checkout@v2
         with:
@@ -36,13 +16,13 @@ jobs:
       - name: Fetch dependencies
         run: sudo apt-get install -y mandoc scdoc ninja-build
       - name: make dir structure
-        run: mkdir -p litani-${{ env.LITANI_VERSION }}/{DEBIAN,usr/{bin,libexec/litani,share/{doc/{litani},man/{man1,man5,man7}}}}
+        run: mkdir -p litani-${GITHUB_REF#refs/*/}/{DEBIAN,usr/{bin,libexec/litani,share/{doc/{litani},man/{man1,man5,man7}}}}
       - name: create control file
         run: |
-          touch litani-${{ env.LITANI_VERSION }}/DEBIAN/control
-          cat << EOF > litani-${{ env.LITANI_VERSION }}/DEBIAN/control
+          touch litani-${GITHUB_REF#refs/*/}/DEBIAN/control
+          cat << EOF > litani-${GITHUB_REF#refs/*/}/DEBIAN/control
           Package: Litani
-          Version: ${{ env.LITANI_VERSION }}
+          Version: ${GITHUB_REF#refs/*/}
           Architecture: amd64
           Depends: ninja-build, gnuplot, graphviz, python3.9, python3-jinja2, python3-voluptuous
           Maintainer: Kareem Khazem <karkhaz@amazon.co.uk>
@@ -52,35 +32,35 @@ jobs:
       - name: clone litani
         run: sudo git clone https://github.com/awslabs/aws-build-accumulator.git /usr/libexec/litani
       - name: create symlink
-        run: sudo ln -s /usr/libexec/litani/litani litani-${{ env.LITANI_VERSION }}/usr/bin/
+        run: sudo ln -s /usr/libexec/litani/litani litani-${GITHUB_REF#refs/*/}/usr/bin/
       - name: copy to usr/libexec
         run: |
-          cp -r /usr/libexec/litani/litani litani-${{ env.LITANI_VERSION }}/usr/libexec/litani/
-          cp -r /usr/libexec/litani/lib litani-${{ env.LITANI_VERSION }}/usr/libexec/litani/
-          cp -r /usr/libexec/litani/bin litani-${{ env.LITANI_VERSION }}/usr/libexec/litani/
-          cp -r /usr/libexec/litani/templates litani-${{ env.LITANI_VERSION }}/usr/libexec/litani/
-          cp -r /usr/libexec/litani/doc litani-${{ env.LITANI_VERSION }}/usr/libexec/litani/
+          cp -r /usr/libexec/litani/litani litani-${GITHUB_REF#refs/*/}/usr/libexec/litani/
+          cp -r /usr/libexec/litani/lib litani-${GITHUB_REF#refs/*/}/usr/libexec/litani/
+          cp -r /usr/libexec/litani/bin litani-${GITHUB_REF#refs/*/}/usr/libexec/litani/
+          cp -r /usr/libexec/litani/templates litani-${GITHUB_REF#refs/*/}/usr/libexec/litani/
+          cp -r /usr/libexec/litani/doc litani-${GITHUB_REF#refs/*/}/usr/libexec/litani/
       - name: update share
         run: |
-          ./litani-${{ env.LITANI_VERSION }}/usr/libexec/litani/doc/configure && ninja
-          mv litani-${{ env.LITANI_VERSION }}/usr/libexec/litani/doc/out/man/*.1 litani-${{ env.LITANI_VERSION }}/usr/share/man/man1
-          mv litani-${{ env.LITANI_VERSION }}/usr/libexec/litani/doc/out/man/*.5 litani-${{ env.LITANI_VERSION }}/usr/share/man/man5
-          mv litani-${{ env.LITANI_VERSION }}/usr/libexec/litani/doc/out/man/*.7 litani-${{ env.LITANI_VERSION }}/usr/share/man/man7
+          ./litani-${GITHUB_REF#refs/*/}/usr/libexec/litani/doc/configure && ninja
+          mv litani-${GITHUB_REF#refs/*/}/usr/libexec/litani/doc/out/man/*.1 litani-${GITHUB_REF#refs/*/}/usr/share/man/man1
+          mv litani-${GITHUB_REF#refs/*/}/usr/libexec/litani/doc/out/man/*.5 litani-${GITHUB_REF#refs/*/}/usr/share/man/man5
+          mv litani-${GITHUB_REF#refs/*/}/usr/libexec/litani/doc/out/man/*.7 litani-${GITHUB_REF#refs/*/}/usr/share/man/man7
       - name: remove files
         run: |
-          rm -rf litani-${{ env.LITANI_VERSION }}/usr/libexec/litani/doc
+          rm -rf litani-${GITHUB_REF#refs/*/}/usr/libexec/litani/doc
           sudo rm -rf /usr/libexec/litani
       - name: Create .deb package
         id: create_packages
         run: |
-          sudo dpkg-deb --build --root-owner-group litani-${{ env.LITANI_VERSION }}
+          sudo dpkg-deb --build --root-owner-group litani-${GITHUB_REF#refs/*/}
           deb_package_name="$(ls *.deb)"
           echo "::set-output name=deb_package::$deb_package_name"
           echo "::set-output name=deb_package_name::$deb_package_name"
       - name: Setup deb package
         run: |
           sudo apt-get update
-          sudo apt install -y ./litani-${{ env.LITANI_VERSION }}.deb
+          sudo apt install -y ./litani-${GITHUB_REF#refs/*/}.deb
       - name: Test deb package
         run: |
           litani -h
