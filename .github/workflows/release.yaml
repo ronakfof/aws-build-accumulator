@@ -94,16 +94,9 @@ jobs:
               AWS Build Accumulator collects build jobs from multiple sources before executing them concurrently. It provides platform-independent job control (timeouts, return code control) and an output format that is easy to render into reports (for example, using the built-in renderer). AWS Build Accumulator shines where your project uses multiple different build systems or requires a unified interface describing heterogeneous build jobs.
             EOF
         - name: Clone Litani
-          run: sudo git clone https://github.com/awslabs/aws-build-accumulator.git /usr/libexec/litani
+          run: git clone https://github.com/awslabs/aws-build-accumulator.git litani-${{ env.LITANI_VERSION }}/usr/libexec/litani
         - name: Create Symlink
           run: sudo ln -s /usr/libexec/litani/litani litani-${{ env.LITANI_VERSION }}/usr/bin/
-        - name: Copy to usr/libexec
-          run: |
-            cp -r /usr/libexec/litani/litani litani-${{ env.LITANI_VERSION }}/usr/libexec/litani/
-            cp -r /usr/libexec/litani/lib litani-${{ env.LITANI_VERSION }}/usr/libexec/litani/
-            cp -r /usr/libexec/litani/bin litani-${{ env.LITANI_VERSION }}/usr/libexec/litani/
-            cp -r /usr/libexec/litani/templates litani-${{ env.LITANI_VERSION }}/usr/libexec/litani/
-            cp -r /usr/libexec/litani/doc litani-${{ env.LITANI_VERSION }}/usr/libexec/litani/
         - name: Move man pages and docs to usr/share
           run: |
             ./litani-${{ env.LITANI_VERSION }}/usr/libexec/litani/doc/configure && ninja
@@ -112,8 +105,7 @@ jobs:
             mv litani-${{ env.LITANI_VERSION }}/usr/libexec/litani/doc/out/man/*.7 litani-${{ env.LITANI_VERSION }}/usr/share/man/man7
         - name: Remove unnecessary files
           run: |
-            rm -rf litani-${{ env.LITANI_VERSION }}/usr/libexec/litani/doc
-            sudo rm -rf /usr/libexec/litani
+            rm -rf litani-${{ env.LITANI_VERSION }}/usr/libexec/litani/doc litani-${{ env.LITANI_VERSION }}/usr/libexec/litani/examples litani-${{ env.LITANI_VERSION }}/usr/libexec/litani/test
         - name: Create .deb package
           id: create_packages
           run: |
