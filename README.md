@@ -20,8 +20,7 @@ To install with [Homebrew](https://brew.sh):
 ```bash
 brew tap aws/tap
 brew install litani
-```
-
+`
 Documentation can also be accessed using `man`:
 
 ```bash
