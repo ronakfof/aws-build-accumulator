@@ -1,0 +1,138 @@
+on:
+  push:
+    tags:
+      - 'litani-*'
+
+name: Create Release and package
+
+jobs:
+  get-version-information:
+    name: Get Version Information
+    runs-on: ubuntu-20.04
+    outputs:
+      version: ${{ steps.split-version.outputs._1 }}
+    steps:
+      - uses: jungwinter/split@v1
+        id: split
+        with:
+          msg: ${{ github.ref }}
+          seperator: '/'
+      - uses: jungwinter/split@v1
+        id: split-version
+        with:
+          msg: ${{ steps.split.outputs._2 }}
+          seperator: '-'
+  perform-release:
+    name: Perform Release
+    runs-on: ubuntu-20.04
+    needs: get-version-information
+    outputs:
+      version: ${{ needs.get-version-information.outputs.version }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+      - name: Create release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          LITANI_VERSION: ${{ needs.get-version-information.outputs.version }}
+        with:
+          tag_name: litani-${{ env.LITANI_VERSION }}
+          release_name: litani-${{ env.LITANI_VERSION }}
+          body: |
+            This is Litani version ${{ env.LITANI_VERSION }}.
+
+            ## MacOS
+
+            On MacOS, install Litani using [Homebrew](https://brew.sh/) with
+
+            ```sh
+            brew tap aws/tap
+            brew install litani
+            ```
+
+            or upgrade (if it's already been installed) with:
+
+            ```sh
+            brew upgrade litani
+            ```
+
+            ## Ubuntu
+
+            On Ubuntu, install LITANI by downloading the *.deb package below for Ubuntu 20 and install with
+
+            ```sh
+            # Ubuntu 20:
+            $ dpkg -i litani-${{ env.LITANI_VERSION }}.deb
+            ```
+          draft: false
+          prerelease: false
+  ubuntu-20_04-package:
+      runs-on: ubuntu-20.04
+      needs: perform-release
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        LITANI_VERSION: ${{ needs.perform-release.outputs.version }}
+      steps:
+        - uses: actions/checkout@v2
+          with:
+            submodules: recursive
+        - name: Fetch dependencies
+          run: sudo apt-get install -y mandoc scdoc ninja-build
+        - name: make dir structure
+          run: mkdir -p litani-${{ env.LITANI_VERSION }}/{DEBIAN,usr/{bin,libexec/litani,share/{doc/{litani},man/{man1,man5,man7}}}}
+        - name: Create a control file
+          run: |
+            touch litani-${{ env.LITANI_VERSION }}/DEBIAN/control
+            cat << EOF > litani-${{ env.LITANI_VERSION }}/DEBIAN/control
+            Package: Litani
+            Version: ${{ env.LITANI_VERSION }}
+            Architecture: amd64
+            Depends: ninja-build, gnuplot, graphviz, python3.9, python3-jinja2, python3-voluptuous
+            Maintainer: Kareem Khazem <karkhaz@amazon.co.uk>
+            Description: A program that provides platform-independent job control.
+              AWS Build Accumulator collects build jobs from multiple sources before executing them concurrently. It provides platform-independent job control (timeouts, return code control) and an output format that is easy to render into reports (for example, using the built-in renderer). AWS Build Accumulator shines where your project uses multiple different build systems or requires a unified interface describing heterogeneous build jobs.
+            EOF
+        - name: Clone Litani
+          run: git clone https://github.com/awslabs/aws-build-accumulator.git litani-${{ env.LITANI_VERSION }}/usr/libexec/litani
+        - name: Create Symlink
+          run: ln -s /usr/libexec/litani/litani litani-${{ env.LITANI_VERSION }}/usr/bin/
+        - name: Move man pages and docs to usr/share
+          run: |
+            ./litani-${{ env.LITANI_VERSION }}/usr/libexec/litani/doc/configure && ninja
+            mv litani-${{ env.LITANI_VERSION }}/usr/libexec/litani/doc/out/man/*.1 litani-${{ env.LITANI_VERSION }}/usr/share/man/man1
+            mv litani-${{ env.LITANI_VERSION }}/usr/libexec/litani/doc/out/man/*.5 litani-${{ env.LITANI_VERSION }}/usr/share/man/man5
+            mv litani-${{ env.LITANI_VERSION }}/usr/libexec/litani/doc/out/man/*.7 litani-${{ env.LITANI_VERSION }}/usr/share/man/man7
+        - name: Remove unnecessary files
+          run: |
+            rm -rf litani-${{ env.LITANI_VERSION }}/usr/libexec/litani/doc litani-${{ env.LITANI_VERSION }}/usr/libexec/litani/examples litani-${{ env.LITANI_VERSION }}/usr/libexec/litani/test
+        - name: Create .deb package
+          id: create_packages
+          run: |
+            sudo dpkg-deb --build --root-owner-group litani-${{ env.LITANI_VERSION }}
+            deb_package_name="$(ls *.deb)"
+            echo "::set-output name=deb_package::$deb_package_name"
+            echo "::set-output name=deb_package_name::$deb_package_name"
+        - name: Setup deb package
+          run: |
+            sudo apt-get update
+            sudo apt install -y ./litani-${{ env.LITANI_VERSION }}.deb
+        - name: Test deb package
+          run: |
+            litani -h
+            man litani
+            litani init --project-name nyx --stages codegen verify check
+            litani add-job --command 'which brew' --pipeline-name 'siesta' --ci-stage codegen --phony-outputs phony_1
+            litani add-job --command 'which python3' --pipeline-name 'siesta' --ci-stage verify --inputs phony_1 --phony-outputs phony_2
+            litani add-job --command 'which docker' --pipeline-name 'siesta' --ci-stage check --inputs phony_2  --phony-outputs phony_3
+            litani run-build
+        - name: Get release
+          id: get_release_info
+          uses: bruceadams/get-release@v1.2.3
+        - name: Upload release binary
+          uses: actions/upload-release-asset@v1.0.2
+          with:
+            upload_url: ${{ steps.get_release_info.outputs.upload_url }}
+            asset_path: ${{ steps.create_packages.outputs.deb_package }}
+            asset_name: ${{ steps.create_packages.outputs.deb_package_name }}
+            asset_content_type: application/x-deb
