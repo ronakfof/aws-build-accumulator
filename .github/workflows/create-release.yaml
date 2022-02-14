@@ -10,7 +10,7 @@ jobs:
     name: Perform Release
     runs-on: ubuntu-20.04
     env:
-      GITHUB_TOKEN: ${{ secrets.RELEASE_CI_ACCESS_TOKEN }}
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v2
@@ -53,14 +53,14 @@ jobs:
     name: Update gh-pages
     runs-on:  macos-10.15
     env:
-      GITHUB_TOKEN: ${{ secrets.RELEASE_CI_ACCESS_TOKEN }}
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v2
       - name: Install utilities
         run: |
           brew install scdoc mandoc coreutils
-          pip3 -m install pyyaml
+          pip3 install pyyaml
       - name: Build doc
         run: cd doc && ./configure && ninja
       - name: Publish Documentation
