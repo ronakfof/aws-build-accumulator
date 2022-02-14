@@ -48,3 +48,23 @@ jobs:
             ```
           draft: false
           prerelease: false
+  
+  update-documentation:
+    name: Update gh-pages
+    runs-on:  macos-10.15
+    env:
+      GITHUB_TOKEN: ${{ secrets.RELEASE_CI_ACCESS_TOKEN }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+      - name: Install utilities
+        run: |
+          brew install scdoc mandoc coreutils
+          pip3 -m install pyyaml
+      - name: Build doc
+        run: cd doc && ./configure && ninja
+      - name: Publish Documentation
+        uses: JamesIves/github-pages-deploy-action@4.1.4
+        with:
+          branch: gh-pages
+          folder: doc/out/html/*
