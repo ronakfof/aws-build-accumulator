@@ -62,9 +62,9 @@ jobs:
           brew install scdoc mandoc coreutils ninja
           pip3 install pyyaml jinja2
       - name: Build doc
-        run: cd doc && ./configure && ninja
+        run: ./doc/configure && ninja
       - name: Publish Documentation
         uses: JamesIves/github-pages-deploy-action@4.1.4
         with:
           branch: gh-pages
-          folder: doc/out/html/*
+          folder: doc/out/html
