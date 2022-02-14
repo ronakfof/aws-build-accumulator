@@ -59,7 +59,7 @@ jobs:
         uses: actions/checkout@v2
       - name: Install utilities
         run: |
-          brew install scdoc mandoc coreutils
+          brew install scdoc mandoc coreutils ninja
           pip3 install pyyaml
       - name: Build doc
         run: cd doc && ./configure && ninja
