@@ -36,4 +36,4 @@ def get_run_build_args():
 
 
 def check_run(run):
-    return run.get("pools") == {}
+    return False
