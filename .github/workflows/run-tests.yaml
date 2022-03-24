@@ -18,3 +18,11 @@ jobs:
           python3 -m pip install jinja2
       - name: Run Unit and e2e tests
         run: ./test/run
+      - name: Upload report as artifact
+        run: echo "REPORT_PATH=$(readlink test/output/latest/html)" >> $GITHUB_ENV
+      - name: Upload bottles as artifact
+        uses: actions/upload-artifact@main
+        if: failure()
+        with:
+          name: Report
+          path: ${{ env.REPORT_PATH }}
