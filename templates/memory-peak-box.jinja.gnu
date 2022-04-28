@@ -28,7 +28,7 @@ set ytics nomirror tc "#263238" font "Helvetica,14"
 unset xtics
 unset key
 
-set title "Peak resident memory for {{ group_name }}" tc "#263238" font "Helvetica,14"
+set title "{{ run }} - Peak resident memory for {{ group_name }}" tc "#263238" font "Helvetica,14"
 
 set xrange [0:1]
 

@@ -33,6 +33,7 @@ import uuid
 
 from lib import litani, litani_report, ninja_syntax
 import lib.capabilities
+import lib.compare
 import lib.graph
 import lib.job_outcome
 import lib.jobs
@@ -293,6 +294,20 @@ def get_args():
     }]:
         flags = arg.pop("flags")
         mutex.add_argument(*flags, **arg)
+    compare_runs = subs.add_parser("compare-runs",
+        help="Compare 2 run files")
+    compare_runs.set_defaults(func=lib.compare.compare_runs)
+    for arg in [{
+            "flags": ["--base-run"],
+            "help": "base run file",
+            "required": True,
+    }, {
+            "flags": ["--second-run"],
+            "help": "second run file",
+            "required": True,
+    }]:
+        flags = arg.pop("flags")
+        compare_runs.add_argument(*flags, **arg)
 
     add_job_pars = subs.add_parser("add-job")
     add_job_pars.set_defaults(func=add_job)

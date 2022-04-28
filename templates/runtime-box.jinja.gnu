@@ -28,7 +28,7 @@ unset key
 
 set ylabel "seconds" tc "#263238" font "Helvetica,14"
 
-set title "Runtime for {{ group_name }}" tc "#263238" font "Helvetica,14"
+set title "{{ run }} - Runtime for {{ group_name }}" tc "#263238" font "Helvetica,14"
 
 set xrange [0:1]
 

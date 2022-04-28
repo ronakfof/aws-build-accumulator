@@ -291,7 +291,7 @@ class StatsGroupRenderer:
             if len(jobs) < 2:
                 continue
             gnu_file = gnu_templ.render(
-                group_name=group_name, jobs=jobs)
+                group_name=group_name, jobs=jobs, run=self.run["project"])
             svg_lines = self.gnuplot.render(gnu_file)
             svgs.append(svg_lines)
         return svgs
@@ -631,6 +631,43 @@ def get_dashboard_svgs(run, env, gnuplot):
             "memory-peak-box.jinja.gnu"),
         "Parallelism": p_renderer.render("run-parallelism.jinja.gnu"),
     }
+
+
+def get_comparison_svgs(base_run, second_run, env, gnuplot):
+    return {
+        "Runtime": get_runtime_svgs(
+          base_run, second_run, env, gnuplot),
+        "Memory Usage": get_memory_usage_svgs(
+          base_run, second_run, env, gnuplot)
+    }
+
+
+def get_runtime_svgs(base_run, second_run, env, gnuplot):
+    base_run_stats_renderer = StatsGroupRenderer(base_run, env, gnuplot)
+    base_runtime_svg = base_run_stats_renderer.render(
+      lambda j: "duration" in j, "runtime-box.jinja.gnu")
+    stage2_run_stats_renderer = StatsGroupRenderer(second_run, env, gnuplot)
+    stage2_runtime_svg = stage2_run_stats_renderer.render(
+      lambda j: "duration" in j, "runtime-box.jinja.gnu")
+    base_runtime_svg.extend(stage2_runtime_svg)
+    return base_runtime_svg
+
+
+def get_memory_usage_svgs(base_run, second_run, env, gnuplot):
+    base_run_stats_renderer = StatsGroupRenderer(base_run, env, gnuplot)
+    base_memory_usage_svg = base_run_stats_renderer.render(
+            lambda j: j.get("memory_trace") and \
+                j["memory_trace"].get("peak") and \
+                j["memory_trace"]["peak"].get("rss"),
+            "memory-peak-box.jinja.gnu")
+    stage2_run_stats_renderer = StatsGroupRenderer(second_run, env, gnuplot)
+    stage2_memory_usage_svg = stage2_run_stats_renderer.render(
+            lambda j: j.get("memory_trace") and \
+                j["memory_trace"].get("peak") and \
+                j["memory_trace"]["peak"].get("rss"),
+            "memory-peak-box.jinja.gnu")
+    base_memory_usage_svg.extend(stage2_memory_usage_svg)
+    return base_memory_usage_svg
 
 
 def get_summary(run):
